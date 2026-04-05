@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id           String           @id @default(cuid())
+  name         String
+  description  String?
+  techStack    String?          // JSON 형태의 문자열로 저장 ({framework, css, db})
+  requirements String?          // 상세 요구사항 문서
+  status       String           @default("planning") // planning, backlog, sprint, done
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  
+  sprints      Sprint[]
+  backlogs     ProductBacklog[]
+  workflow     Workflow?
+}
+
+model ProductBacklog {
+  id                 String   @id @default(cuid())
+  projectId          String
+  title              String
+  description        String?
+  userStory          String?
+  acceptanceCriteria String?
+  priority           String   @default("medium") // critical, high, medium, low
+  storyPoints        Int?
+  status             String   @default("todo") // todo, inSprint, done
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks              Task[]
+}
+
+model Sprint {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  goal      String?
+  startDate DateTime?
+  endDate   DateTime?
+  velocity  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+}
+
+model Task {
+  id            String   @id @default(cuid())
+  sprintId      String?
+  backlogId     String?
+  title         String
+  description   String?
+  assignedAgent String?
+  status        String   @default("todo") // todo, inProgress, review, done
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sprint        Sprint?          @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  backlog       ProductBacklog?  @relation(fields: [backlogId], references: [id], onDelete: SetNull)
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // planner, designer, coder, tester
+  status      String   @default("idle") // idle, running, paused, error
+  currentTask String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Workflow {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  orchestratorStatus String   @default("idle")
+  currentPhase       String   @default("planning") // planning, backlog, sprint, review, retro
+  harnessConfig      String?  // JSON 형태의 문자열
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
