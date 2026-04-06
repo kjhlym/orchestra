@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const backlogId = searchParams.get('backlogId');
 
   try {
-    const where: any = {};
+    const where: { sprintId?: string; backlogId?: string } = {};
     if (sprintId) where.sprintId = sprintId;
     if (backlogId) where.backlogId = backlogId;
 
@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(tasks);
   } catch (error) {
-    console.error('Error fetching tasks:', error);
-    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
+    console.error('작업 목록 조회 오류:', error);
+    return NextResponse.json({ error: '작업 목록을 불러오지 못했습니다.' }, { status: 500 });
   }
 }
 
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const { title, description, assignedAgent, sprintId, backlogId } = body;
 
     if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+      return NextResponse.json({ error: '작업 제목은 필수입니다.' }, { status: 400 });
     }
 
     const task = await prisma.task.create({
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
-    console.error('Error creating task:', error);
-    return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
+    console.error('작업 생성 오류:', error);
+    return NextResponse.json({ error: '작업을 생성하지 못했습니다.' }, { status: 500 });
   }
 }

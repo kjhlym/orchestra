@@ -1,45 +1,74 @@
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
     const projects = await prisma.project.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
+        workflow: true,
         _count: {
-          select: { sprints: true, backlogs: true }
-        }
-      }
+          select: {
+            backlogs: true,
+            sprints: true,
+          },
+        },
+      },
     });
+
     return NextResponse.json(projects);
   } catch (error) {
-    console.error('Error fetching projects:', error);
-    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
+    console.error("프로젝트 목록 조회 오류:", error);
+    return NextResponse.json(
+      { error: "프로젝트 목록을 불러오지 못했습니다." },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { name, description, techStack, requirements } = body;
+    const body = (await request.json()) as {
+      name?: string;
+      description?: string;
+      techStack?: Record<string, string>;
+      requirements?: Record<string, string>;
+    };
+
+    const name = body.name?.trim();
 
     if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "프로젝트명은 필수입니다." },
+        { status: 400 }
+      );
     }
 
     const project = await prisma.project.create({
       data: {
         name,
-        description,
-        techStack: typeof techStack === 'object' ? JSON.stringify(techStack) : techStack,
-        requirements,
-        status: 'planning'
-      }
+        description: body.description?.trim() || null,
+        techStack: body.techStack ? JSON.stringify(body.techStack) : null,
+        requirements: body.requirements ? JSON.stringify(body.requirements) : null,
+        status: "planning",
+        workflow: {
+          create: {
+            orchestratorStatus: "idle",
+            currentPhase: "planning",
+          },
+        },
+      },
+      include: {
+        workflow: true,
+      },
     });
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
-    console.error('Error creating project:', error);
-    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
+    console.error("프로젝트 생성 오류:", error);
+    return NextResponse.json(
+      { error: "프로젝트를 생성하지 못했습니다." },
+      { status: 500 }
+    );
   }
 }

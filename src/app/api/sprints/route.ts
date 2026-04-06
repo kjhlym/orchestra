@@ -15,8 +15,8 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(sprints);
   } catch (error) {
-    console.error('Error fetching sprints:', error);
-    return NextResponse.json({ error: 'Failed to fetch sprints' }, { status: 500 });
+    console.error('스프린트 목록 조회 오류:', error);
+    return NextResponse.json({ error: '스프린트 목록을 불러오지 못했습니다.' }, { status: 500 });
   }
 }
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const { projectId, name, goal, startDate, endDate, velocity } = body;
 
     if (!projectId || !name) {
-      return NextResponse.json({ error: 'Project ID and Name are required' }, { status: 400 });
+      return NextResponse.json({ error: '프로젝트 ID와 스프린트명은 필수입니다.' }, { status: 400 });
     }
 
     const sprint = await prisma.sprint.create({
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(sprint, { status: 201 });
   } catch (error) {
-    console.error('Error creating sprint:', error);
-    return NextResponse.json({ error: 'Failed to create sprint' }, { status: 500 });
+    console.error('스프린트 생성 오류:', error);
+    return NextResponse.json({ error: '스프린트를 생성하지 못했습니다.' }, { status: 500 });
   }
 }

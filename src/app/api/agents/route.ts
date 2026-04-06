@@ -8,19 +8,18 @@ export async function GET() {
     });
     return NextResponse.json(agents);
   } catch (error) {
-    console.error('Error fetching agents:', error);
-    return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 });
+    console.error('에이전트 목록 조회 오류:', error);
+    return NextResponse.json({ error: '에이전트 목록을 불러오지 못했습니다.' }, { status: 500 });
   }
 }
 
-// 에이전트는 기획 단계에서 자동으로 스폰되는 구조 등을 상상할 수 있지만 우선은 기본 생성 제공
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { name, type } = body;
 
     if (!name || !type) {
-      return NextResponse.json({ error: 'Name and Type are required' }, { status: 400 });
+      return NextResponse.json({ error: '이름과 유형은 필수입니다.' }, { status: 400 });
     }
 
     const agent = await prisma.agent.create({
@@ -33,7 +32,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(agent, { status: 201 });
   } catch (error) {
-    console.error('Error creating agent:', error);
-    return NextResponse.json({ error: 'Failed to create agent' }, { status: 500 });
+    console.error('에이전트 생성 오류:', error);
+    return NextResponse.json({ error: '에이전트를 생성하지 못했습니다.' }, { status: 500 });
   }
 }

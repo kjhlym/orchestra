@@ -15,8 +15,8 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(backlogs);
   } catch (error) {
-    console.error('Error fetching backlogs:', error);
-    return NextResponse.json({ error: 'Failed to fetch backlogs' }, { status: 500 });
+    console.error('백로그 목록 조회 오류:', error);
+    return NextResponse.json({ error: '백로그 목록을 불러오지 못했습니다.' }, { status: 500 });
   }
 }
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const { projectId, title, description, userStory, acceptanceCriteria, priority, storyPoints } = body;
 
     if (!projectId || !title) {
-      return NextResponse.json({ error: 'Project ID and Title are required' }, { status: 400 });
+      return NextResponse.json({ error: '프로젝트 ID와 제목은 필수입니다.' }, { status: 400 });
     }
 
     const backlog = await prisma.productBacklog.create({
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(backlog, { status: 201 });
   } catch (error) {
-    console.error('Error creating backlog:', error);
-    return NextResponse.json({ error: 'Failed to create backlog' }, { status: 500 });
+    console.error('백로그 생성 오류:', error);
+    return NextResponse.json({ error: '백로그를 생성하지 못했습니다.' }, { status: 500 });
   }
 }

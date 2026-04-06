@@ -11,8 +11,8 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(workflows);
   } catch (error) {
-    console.error('Error fetching workflows:', error);
-    return NextResponse.json({ error: 'Failed to fetch workflows' }, { status: 500 });
+    console.error('워크플로우 목록 조회 오류:', error);
+    return NextResponse.json({ error: '워크플로우 목록을 불러오지 못했습니다.' }, { status: 500 });
   }
 }
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const { projectId, harnessConfig } = body;
 
     if (!projectId) {
-      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
+      return NextResponse.json({ error: '프로젝트 ID는 필수입니다.' }, { status: 400 });
     }
 
     const workflow = await prisma.workflow.create({
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(workflow, { status: 201 });
   } catch (error) {
-    console.error('Error creating workflow:', error);
-    return NextResponse.json({ error: 'Failed to create workflow' }, { status: 500 });
+    console.error('워크플로우 생성 오류:', error);
+    return NextResponse.json({ error: '워크플로우를 생성하지 못했습니다.' }, { status: 500 });
   }
 }
