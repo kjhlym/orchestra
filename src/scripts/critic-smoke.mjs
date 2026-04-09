@@ -1,4 +1,4 @@
-import { readdir, readFile, rm, stat } from "fs/promises";
+import { mkdir, readdir, readFile, rm, stat } from "fs/promises";
 import path from "path";
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:3005";
@@ -8,6 +8,7 @@ const WORKSPACE_ROOT = process.env.ORCHESTRA_PROJECTS_ROOT?.trim()
 const PROJECT_NAME = `비평-스모크-${Date.now()}`;
 
 async function main() {
+  await mkdir(WORKSPACE_ROOT, { recursive: true });
   const before = new Set(await listDirectories(WORKSPACE_ROOT));
   const projectDir = await bootstrapProject(before);
 
