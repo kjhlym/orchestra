@@ -140,6 +140,11 @@ async function ensureWorkspaceExists(workspacePath) {
     await mkdir(path.dirname(workspacePath), { recursive: true });
   }
 
+  const reusableWorkspace = await findReusableWorkspace(path.dirname(workspacePath));
+  if (reusableWorkspace) {
+    return reusableWorkspace;
+  }
+
   const input = {
     ...DEFAULT_INPUT,
     name: `${DEFAULT_INPUT.name} ${Date.now()}`,
@@ -229,6 +234,35 @@ async function waitForWorkspace(workspaceRoot, before) {
 async function listDirectories(rootPath) {
   const entries = await readdir(rootPath, { withFileTypes: true }).catch(() => []);
   return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+}
+
+async function findReusableWorkspace(workspaceRoot) {
+  const directories = await listDirectories(workspaceRoot);
+
+  for (const directory of directories) {
+    const candidatePath = path.join(workspaceRoot, directory);
+
+    try {
+      const candidateContext = JSON.parse(
+        await readFile(path.join(candidatePath, "project.context.json"), "utf8")
+      );
+      const candidateStats =
+        candidateContext.repairProfile?.roleQualityStats ?? candidateContext.roleQualityStats ?? {};
+
+      if (
+        Number(candidateStats.planner ?? 0) >= 1 &&
+        Number(candidateStats.critic ?? 0) >= 1 &&
+        Number(candidateStats.designer ?? 0) >= 2 &&
+        Number(candidateStats.tester ?? 0) >= 1
+      ) {
+        return candidatePath;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return "";
 }
 
 function assert(condition, message) {
