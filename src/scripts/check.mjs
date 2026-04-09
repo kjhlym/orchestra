@@ -233,7 +233,11 @@ function getNpmCommand() {
   return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
