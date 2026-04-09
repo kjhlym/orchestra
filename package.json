@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:e2e": "node src/scripts/run-playwright-e2e.mjs",
+    "test:e2e:new-project": "node src/scripts/run-playwright-e2e.mjs e2e/new-project.spec.ts",
     "check": "node src/scripts/check.mjs",
     "smoke:critic": "node src/scripts/critic-smoke.mjs",
     "smoke:planner": "node src/scripts/role-regression.mjs --workspace ../orchestra_projects/운영-콘텐츠-허브-비평 --role planner --min-count 1 --expected-label planner",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.59.1",
     "@prisma/client": "^6.19.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

@@ -168,6 +168,15 @@ export default function RequirementsForm() {
     }
   };
 
+  const schedulePreviewRedirect = (projectId: string, requestVersion: number, delayMs: number) => {
+    clearRedirectTimer();
+    redirectTimerRef.current = window.setTimeout(() => {
+      if (requestVersion === requestVersionRef.current) {
+        router.replace(`/projects/${projectId}/preview`);
+      }
+    }, delayMs);
+  };
+
   const beginFreshProject = () => {
     requestVersionRef.current += 1;
     clearRedirectTimer();
@@ -543,6 +552,7 @@ export default function RequirementsForm() {
         if (event.type === 'project-created') {
           setCreatedProjectId(event.projectId);
           setStreamMessages((prev) => [...prev, `${event.projectName} 프로젝트가 생성되었습니다.`]);
+          schedulePreviewRedirect(event.projectId, requestVersion, 700);
           return;
         }
 
@@ -561,11 +571,7 @@ export default function RequirementsForm() {
             `생성 항목 ${event.backlogCount}개가 완료되었습니다.`,
             '홈페이지 미리보기로 이동합니다.',
           ]);
-          redirectTimerRef.current = window.setTimeout(() => {
-            if (requestVersion === requestVersionRef.current) {
-              router.replace(`/projects/${event.projectId}/preview`);
-            }
-          }, 450);
+          schedulePreviewRedirect(event.projectId, requestVersion, 450);
           return;
         }
 
@@ -772,7 +778,7 @@ export default function RequirementsForm() {
               </div>
             )}
 
-            {createdProjectId && !loading && (
+            {createdProjectId && (
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -935,12 +941,14 @@ export default function RequirementsForm() {
                   value={draftSeed}
                   onChange={(e) => setDraftSeed(e.target.value)}
                   placeholder="예: 새로운 홈페이지 아이디어"
+                  data-testid="new-project-idea"
                 />
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => void handleAutoFill()}
                   disabled={draftLoading}
+                  data-testid="new-project-autofill"
                 >
                   {draftLoading ? '자동 작성 중...' : '자동 작성 채우기'}
                 </Button>
@@ -966,6 +974,7 @@ export default function RequirementsForm() {
                     placeholder="예: 브랜드 홈페이지"
                     value={formData.name}
                     onChange={(e) => handleChange('name', '', e.target.value)}
+                    data-testid="new-project-name"
                   />
                 </div>
                 <div className="space-y-2">
@@ -975,6 +984,7 @@ export default function RequirementsForm() {
                     placeholder="예: 정보를 찾는 방문자"
                     value={formData.requirements.targetAudience}
                     onChange={(e) => handleChange('requirements', 'targetAudience', e.target.value)}
+                    data-testid="new-project-audience"
                   />
                 </div>
               </div>
@@ -987,6 +997,7 @@ export default function RequirementsForm() {
                   rows={4}
                   value={formData.description}
                   onChange={(e) => handleChange('description', '', e.target.value)}
+                  data-testid="new-project-description"
                 />
               </div>
 
@@ -1151,6 +1162,7 @@ export default function RequirementsForm() {
                   rows={4}
                   value={formData.requirements.mustHaves}
                   onChange={(e) => handleChange('requirements', 'mustHaves', e.target.value)}
+                  data-testid="new-project-must-haves"
                 />
               </div>
               <div className="space-y-2">
@@ -1160,6 +1172,7 @@ export default function RequirementsForm() {
                   rows={3}
                   value={formData.requirements.niceToHaves}
                   onChange={(e) => handleChange('requirements', 'niceToHaves', e.target.value)}
+                  data-testid="new-project-nice-to-haves"
                 />
               </div>
               <div className="space-y-2">
@@ -1169,6 +1182,7 @@ export default function RequirementsForm() {
                   rows={2}
                   value={formData.requirements.constraints}
                   onChange={(e) => handleChange('requirements', 'constraints', e.target.value)}
+                  data-testid="new-project-constraints"
                 />
               </div>
             </CardContent>
@@ -1293,6 +1307,7 @@ export default function RequirementsForm() {
                 className="bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-50"
                 onClick={handleSubmit}
                 disabled={loading || !canCreateProject}
+                data-testid="new-project-submit"
               >
                 {loading ? '홈페이지 생성 중...' : '홈페이지 만들기'}
               </Button>

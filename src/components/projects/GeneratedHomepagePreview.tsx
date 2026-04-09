@@ -11,6 +11,7 @@ export default function GeneratedHomepagePreview({
   workspacePath: string;
 }) {
   const { blueprint, theme } = preview;
+  const isCommerce = blueprint.category === "commerce";
   const darkText = theme.pageShell.includes("text-slate-50");
   const headingTone = darkText ? "text-white" : "text-slate-950";
   const navTone = darkText ? "text-slate-200" : "text-slate-600";
@@ -157,7 +158,10 @@ export default function GeneratedHomepagePreview({
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-4 lg:px-8">
+        <section
+          id={isCommerce ? "collection-filters" : undefined}
+          className="mx-auto max-w-7xl px-6 pb-4 lg:px-8"
+        >
           <div className={theme.sectionShell}>
             <div className={`text-xs font-semibold uppercase tracking-[0.32em] ${theme.accentLabel}`}>탐색 포인트</div>
             <h2 className={`mt-2 text-2xl font-semibold tracking-tight ${headingTone}`}>
@@ -221,7 +225,10 @@ export default function GeneratedHomepagePreview({
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+        <section
+          id={isCommerce ? "shopping-guide" : undefined}
+          className="mx-auto max-w-7xl px-6 py-8 lg:px-8"
+        >
           <div className={`grid gap-5 lg:grid-cols-[1fr_1fr] ${theme.sectionShell}`}>
             <div className={theme.cardShell}>
               <div className={`text-xs font-semibold uppercase tracking-[0.32em] ${theme.accentLabel}`}>
@@ -271,7 +278,10 @@ export default function GeneratedHomepagePreview({
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+        <section
+          id={isCommerce ? "reviews" : undefined}
+          className="mx-auto max-w-7xl px-6 py-8 lg:px-8"
+        >
           <div className={theme.sectionShell}>
             <div className="flex items-end justify-between gap-4">
               <div>

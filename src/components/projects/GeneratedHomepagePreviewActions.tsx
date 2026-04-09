@@ -45,13 +45,22 @@ export default function GeneratedHomepagePreviewActions({
 
   return (
     <div className={containerClass}>
-      <button type="button" onClick={handleCopyPreviewLink} className={primaryClass}>
+      <button
+        type="button"
+        onClick={handleCopyPreviewLink}
+        className={primaryClass}
+        data-testid="preview-copy-link"
+      >
         {copyLabel}
       </button>
-      <Link href={`/projects/${projectId}/workflow`} className={secondaryClass}>
+      <Link
+        href={`/projects/${projectId}/workflow`}
+        className={secondaryClass}
+        data-testid="preview-deploy-prep"
+      >
         배포 준비로 이동
       </Link>
-      <Link href={`/projects/${projectId}`} className={ghostClass}>
+      <Link href={`/projects/${projectId}`} className={ghostClass} data-testid="preview-project-summary">
         프로젝트 요약
       </Link>
     </div>
