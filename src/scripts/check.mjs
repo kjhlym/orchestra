@@ -1,15 +1,25 @@
 import { spawn } from "child_process";
+import { cp, mkdir, rm } from "fs/promises";
+import path from "path";
 
 const CHECK_PORT = Number(process.env.CHECK_PORT ?? 4010);
 const BASE_URL = process.env.BASE_URL ?? `http://127.0.0.1:${CHECK_PORT}`;
 const READY_TIMEOUT_MS = Number(process.env.CHECK_READY_TIMEOUT_MS ?? 120000);
+const ROOT_DIR = process.cwd();
+const TEMP_DIR = path.join(ROOT_DIR, ".check");
+const SOURCE_DB_PATH = path.join(ROOT_DIR, "prisma", "dev.db");
+const TEMP_DB_PATH = path.join(TEMP_DIR, "check.db");
+const CHECK_DATABASE_URL = "file:../.check/check.db";
 
 async function main() {
+  await prepareCheckEnvironment();
+
   const dev = spawn(getNpmCommand(), ["run", "dev", "--", "--port", String(CHECK_PORT)], {
-    cwd: process.cwd(),
+    cwd: ROOT_DIR,
     env: {
       ...process.env,
       PORT: String(CHECK_PORT),
+      DATABASE_URL: CHECK_DATABASE_URL,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -52,7 +62,14 @@ async function main() {
     }
 
     await stopDev();
+    await rm(TEMP_DIR, { recursive: true, force: true }).catch(() => null);
   }
+}
+
+async function prepareCheckEnvironment() {
+  await rm(TEMP_DIR, { recursive: true, force: true }).catch(() => null);
+  await mkdir(TEMP_DIR, { recursive: true });
+  await cp(SOURCE_DB_PATH, TEMP_DB_PATH);
 }
 
 function waitForReady(dev, port, timeoutMs) {
