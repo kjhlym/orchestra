@@ -77,7 +77,7 @@ model Task {
 model Agent {
   id          String   @id @default(cuid())
   name        String
-  type        String   // planner, designer, coder, tester
+  type        String   @unique // planner, critic, designer, coder, tester
   status      String   @default("idle") // idle, running, paused, error
   currentTask String?
   createdAt   DateTime @default(now())

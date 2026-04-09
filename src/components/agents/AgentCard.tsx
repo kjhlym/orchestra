@@ -44,21 +44,30 @@ export default function AgentCard({ agent }: { agent: Agent }) {
           </div>
         </div>
         
-        <div className="flex-1 bg-gray-900 rounded-md p-3 text-green-400 font-mono text-xs overflow-y-auto max-h-32 shadow-inner">
-          <div className="flex items-center gap-1 text-gray-500 mb-2 border-b border-gray-800 pb-1">
-            <TerminalSquare className="w-3 h-3" />
-            <span>터미널 실시간 로그</span>
+          <div className="flex-1 bg-gray-900 rounded-md p-3 text-green-400 font-mono text-xs overflow-y-auto max-h-32 shadow-inner">
+            <div className="flex items-center gap-1 text-gray-500 mb-2 border-b border-gray-800 pb-1">
+              <TerminalSquare className="w-3 h-3" />
+              <span>터미널 실시간 로그</span>
+            </div>
+            <div className="space-y-1">
+              <div>&gt; 에이전트 초기화 완료</div>
+              {agent.status === 'running' ? (
+                <>
+                  {agent.type === 'critic' ? (
+                    <>
+                      <div>&gt; 중복 섹션과 불필요한 렌더링을 비평 중...</div>
+                      <div>&gt; 구조 단순화 제안 생성 중... <span className="animate-pulse">_</span></div>
+                    </>
+                  ) : (
+                    <>
+                      <div>&gt; 백로그 컨텍스트 수신 중...</div>
+                      <div>&gt; 구조 생성 중... <span className="animate-pulse">_</span></div>
+                    </>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
-          <div className="space-y-1">
-            <div>&gt; 에이전트 초기화 완료</div>
-            {agent.status === 'running' ? (
-              <>
-                <div>&gt; 백로그 컨텍스트 수신 중...</div>
-                <div>&gt; 구조 생성 중... <span className="animate-pulse">_</span></div>
-              </>
-            ) : null}
-          </div>
-        </div>
       </CardContent>
     </Card>
   );

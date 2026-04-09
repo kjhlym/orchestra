@@ -19,7 +19,7 @@ export default async function AgentsPage() {
         <div className="rounded-xl border border-dashed bg-white p-10 text-center">
           <div className="text-lg font-semibold">에이전트가 아직 준비되지 않았습니다</div>
           <p className="mt-2 text-sm text-slate-500">
-            워크플로우를 시작하면 기본 기획, 디자인, 개발, QA 에이전트가 자동으로 준비됩니다.
+            워크플로우를 시작하면 기본 기획, 비평, 디자인, 개발, QA 에이전트가 자동으로 준비됩니다.
           </p>
         </div>
       ) : (

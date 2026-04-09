@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check": "node src/scripts/check.mjs",
+    "smoke:critic": "node src/scripts/critic-smoke.mjs",
+    "smoke:planner": "node src/scripts/role-regression.mjs --workspace ../orchestra_projects/운영-콘텐츠-허브-비평 --role planner --min-count 1 --expected-label planner",
+    "smoke:designer": "node src/scripts/role-regression.mjs --workspace ../orchestra_projects/운영-콘텐츠-허브-비평 --role designer --min-count 2 --expected-label designer",
+    "smoke:tester": "node src/scripts/role-regression.mjs --workspace ../orchestra_projects/운영-콘텐츠-허브-비평 --role tester --min-count 1 --expected-label tester"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

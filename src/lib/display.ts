@@ -21,6 +21,7 @@ export const AGENT_STATUS_LABELS: Record<string, string> = {
 
 export const AGENT_TYPE_LABELS: Record<string, string> = {
   planner: "기획",
+  critic: "비평",
   designer: "디자인",
   coder: "개발",
   tester: "테스트",

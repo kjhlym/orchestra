@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const TABS = [
+  { href: "preview", label: "홈페이지 미리보기" },
   { href: "backlog", label: "제품 백로그" },
   { href: "sprint", label: "스프린트 보드" },
   { href: "agents", label: "에이전트 모니터" },

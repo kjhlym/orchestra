@@ -2,8 +2,7 @@
 // 필요한 패키지: npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
-
-const databaseUrl = process.env["DATABASE_URL"];
+import { resolveDatabaseUrl } from "./src/lib/database";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -11,6 +10,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: databaseUrl!,
+    url: resolveDatabaseUrl(),
   },
 });

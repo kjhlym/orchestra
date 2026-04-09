@@ -3,6 +3,7 @@ import type {
   GeneratedBacklogItem,
   ProjectBootstrapInput,
 } from "@/lib/bootstrap";
+import { buildFallbackBootstrapDraft, normalizeBootstrapDraft } from "@/lib/bootstrap-draft";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
@@ -45,6 +46,55 @@ const BACKLOG_RESPONSE_SCHEMA = {
   },
 } as const;
 
+const BOOTSTRAP_DRAFT_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    name: { type: "string" },
+    description: { type: "string" },
+    techStack: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        framework: {
+          type: "string",
+          enum: ["nextjs", "vue", "svelte", "python"],
+        },
+        css: {
+          type: "string",
+          enum: ["tailwind", "vanilla", "scss", "styled"],
+        },
+        database: {
+          type: "string",
+          enum: ["sqlite", "postgres", "mongodb", "supabase"],
+        },
+        deployment: {
+          type: "string",
+          enum: ["vercel", "cloudflare", "aws", "local"],
+        },
+      },
+      required: ["framework", "css", "database", "deployment"],
+    },
+    requirements: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        targetAudience: { type: "string" },
+        mustHaves: { type: "string" },
+        niceToHaves: { type: "string" },
+        constraints: { type: "string" },
+      },
+      required: [
+        "targetAudience",
+        "mustHaves",
+        "niceToHaves",
+        "constraints",
+      ],
+    },
+  },
+  required: ["name", "description", "techStack", "requirements"],
+} as const;
+
 type GeminiGenerateResponse = {
   candidates?: Array<{
     content?: {
@@ -79,11 +129,29 @@ export function getGeminiModel() {
   return DEFAULT_GEMINI_MODEL;
 }
 
-export async function generateBacklogItems(input: ProjectBootstrapInput) {
+type GeminiGenerationSource = "gemini" | "fallback";
+
+type BacklogGenerationResult = {
+  items: GeneratedBacklogItem[];
+  source: GeminiGenerationSource;
+  reason?: string;
+};
+
+type BootstrapDraftGenerationResult = {
+  draft: ProjectBootstrapInput;
+  source: GeminiGenerationSource;
+  reason?: string;
+};
+
+export async function generateBacklogItems(
+  input: ProjectBootstrapInput
+): Promise<BacklogGenerationResult> {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY 환경 변수가 설정되어 있지 않습니다.");
+    const reason = "GEMINI_API_KEY가 없어서 로컬 백로그 초안을 사용했습니다.";
+    console.warn(`[gemini] backlog fallback: ${reason}`);
+    return { items: buildFallbackBacklogItems(input), source: "fallback", reason };
   }
 
   const response = await fetch(
@@ -148,26 +216,113 @@ export async function generateBacklogItems(input: ProjectBootstrapInput) {
   try {
     rawItems = parseGeminiJson(text);
   } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Gemini 응답 JSON을 해석하지 못했습니다.");
+    const reason =
+      error instanceof Error
+        ? `${error.message} 로컬 백로그 초안을 사용했습니다.`
+        : "Gemini 응답 JSON을 해석하지 못해 로컬 백로그 초안을 사용했습니다.";
+    console.warn(`[gemini] backlog fallback: ${reason}`);
+    return { items: buildFallbackBacklogItems(input), source: "fallback", reason };
   }
 
-  if (!Array.isArray(rawItems)) {
-    throw new Error("Gemini 응답 형식이 배열이 아닙니다.");
-  }
-
-  const items = rawItems
+  const items = normalizeBacklogResponse(rawItems)
     .map(normalizeBacklogItem)
     .filter((item): item is GeneratedBacklogItem => item !== null)
     .slice(0, 8);
 
   if (items.length === 0) {
-    throw new Error("저장할 수 있는 백로그 항목을 생성하지 못했습니다.");
+    const reason = "Gemini 응답이 배열 형태가 아니거나 유효한 항목이 없어서 로컬 백로그 초안을 사용했습니다.";
+    console.warn(`[gemini] backlog fallback: ${reason}`);
+    return { items: buildFallbackBacklogItems(input), source: "fallback", reason };
   }
 
-  return items;
+  return { items, source: "gemini" };
+}
+
+export async function generateBootstrapDraft(
+  idea: string
+): Promise<BootstrapDraftGenerationResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    const reason = "GEMINI_API_KEY가 없어서 로컬 초안 템플릿을 사용했습니다.";
+    console.warn(`[gemini] bootstrap draft fallback: ${reason}`);
+    return { draft: buildFallbackBootstrapDraft(idea), source: "fallback", reason };
+  }
+
+  try {
+    const response = await fetch(
+      `${GEMINI_API_BASE}/models/${getGeminiModel()}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text: [
+                  "너는 시니어 제품 디자이너다.",
+                  "입력된 한 줄 아이디어를 바탕으로 새 프로젝트 폼 초안을 작성한다.",
+                  "결과는 JSON 객체 하나만 반환한다.",
+                  "name, description, techStack, requirements를 모두 채운다.",
+                  "techStack은 nextjs/vue/svelte/python, tailwind/vanilla/scss/styled, sqlite/postgres/mongodb/supabase, vercel/cloudflare/aws/local 중 하나씩 선택한다.",
+                  "requirements는 한국어로 간결하지만 구체적으로 작성한다.",
+                ].join(" "),
+              },
+            ],
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: buildBootstrapDraftPrompt(idea),
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 2048,
+            responseMimeType: "application/json",
+            responseJsonSchema: BOOTSTRAP_DRAFT_RESPONSE_SCHEMA,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const reason = "Gemini 초안 생성 API 응답이 성공하지 않아 로컬 템플릿을 사용했습니다.";
+      console.warn(`[gemini] bootstrap draft fallback: ${reason}`);
+      return { draft: buildFallbackBootstrapDraft(idea), source: "fallback", reason };
+    }
+
+    const payload = (await response.json()) as GeminiGenerateResponse;
+    const text = payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? "")
+      .join("")
+      .trim();
+
+    if (!text) {
+      const reason = "Gemini 초안 응답이 비어 있어 로컬 템플릿을 사용했습니다.";
+      console.warn(`[gemini] bootstrap draft fallback: ${reason}`);
+      return { draft: buildFallbackBootstrapDraft(idea), source: "fallback", reason };
+    }
+
+    const parsed = normalizeBootstrapDraft(parseGeminiJson(text));
+    if (!parsed) {
+      const reason = "Gemini 초안 응답 파싱에 실패해 로컬 템플릿을 사용했습니다.";
+      console.warn(`[gemini] bootstrap draft fallback: ${reason}`);
+      return { draft: buildFallbackBootstrapDraft(idea), source: "fallback", reason };
+    }
+
+    return { draft: parsed, source: "gemini" };
+  } catch {
+    const reason = "Gemini 초안 생성 중 예외가 발생해 로컬 템플릿을 사용했습니다.";
+    console.warn(`[gemini] bootstrap draft fallback: ${reason}`);
+    return { draft: buildFallbackBootstrapDraft(idea), source: "fallback", reason };
+  }
 }
 
 function buildBacklogPrompt(input: ProjectBootstrapInput) {
@@ -183,6 +338,127 @@ function buildBacklogPrompt(input: ProjectBootstrapInput) {
     "- title과 description은 모두 한국어로 작성한다.",
     "",
     JSON.stringify(input, null, 2),
+  ].join("\n");
+}
+
+function buildFallbackBacklogItems(input: ProjectBootstrapInput): GeneratedBacklogItem[] {
+  const projectName = input.name.trim() || "새 프로젝트";
+  const targetAudience =
+    input.requirements.targetAudience.trim() || "실무 사용자";
+
+  return [
+    {
+      title: `${projectName} 기본 구조`,
+      description: "프로젝트의 핵심 화면과 데이터 흐름을 만든다.",
+      userStory: `사용자로서 ${projectName}의 핵심 기능을 바로 사용할 수 있기를 원합니다.`,
+      acceptanceCriteria: [
+        "핵심 화면이 정상적으로 열린다.",
+        "기본 데이터 흐름이 작동한다.",
+      ],
+      priority: "high",
+      storyPoints: 3,
+    },
+    {
+      title: "핵심 작업 흐름",
+      description: `${targetAudience}가 가장 자주 쓰는 흐름을 구현한다.`,
+      userStory: `사용자로서 ${targetAudience}가 반복 작업을 빠르게 처리하고 싶습니다.`,
+      acceptanceCriteria: [
+        "주요 작업을 3단계 이내로 끝낼 수 있다.",
+        "결과가 즉시 화면에 반영된다.",
+      ],
+      priority: "critical",
+      storyPoints: 5,
+    },
+    {
+      title: "데이터 저장",
+      description: "입력한 내용을 안전하게 저장하고 다시 불러올 수 있게 한다.",
+      userStory: "사용자로서 내가 입력한 내용을 나중에 다시 확인하고 싶습니다.",
+      acceptanceCriteria: [
+        "저장 후 새로고침해도 데이터가 유지된다.",
+        "삭제 및 수정 동작이 정상적으로 작동한다.",
+      ],
+      priority: "high",
+      storyPoints: 3,
+    },
+    {
+      title: "운영자 관리 화면",
+      description: "관리자가 상태와 진행 상황을 한눈에 볼 수 있게 한다.",
+      userStory: "운영자로서 현재 진행 상태를 빠르게 파악하고 싶습니다.",
+      acceptanceCriteria: [
+        "목록과 상세 정보가 표시된다.",
+        "상태 변경이 가능하다.",
+      ],
+      priority: "medium",
+      storyPoints: 3,
+    },
+    {
+      title: "기본 검증",
+      description: "입력값과 오류 상황을 사용자 친화적으로 처리한다.",
+      userStory: "사용자로서 잘못된 입력을 했을 때 바로 알 수 있기를 원합니다.",
+      acceptanceCriteria: [
+        "필수 입력값이 비어 있으면 저장되지 않는다.",
+        "오류 메시지가 이해하기 쉽게 표시된다.",
+      ],
+      priority: "medium",
+      storyPoints: 2,
+    },
+  ];
+}
+
+function normalizeBacklogResponse(value: unknown) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  const candidates = [
+    record.backlogs,
+    record.backlogItems,
+    record.items,
+    record.data,
+    record.result,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  if (looksLikeBacklogItem(record)) {
+    return [record];
+  }
+
+  return [];
+}
+
+function looksLikeBacklogItem(value: Record<string, unknown>) {
+  return (
+    typeof value.title === "string" ||
+    typeof value.description === "string" ||
+    typeof value.userStory === "string" ||
+    Array.isArray(value.acceptanceCriteria) ||
+    typeof value.priority === "string" ||
+    typeof value.storyPoints === "string" ||
+    typeof value.storyPoints === "number"
+  );
+}
+
+function buildBootstrapDraftPrompt(idea: string) {
+  const normalizedIdea = idea.trim();
+
+  return [
+    "다음 한 줄 아이디어를 바탕으로 새 프로젝트 초안을 작성하라.",
+    "name은 2~6단어의 프로젝트명으로 쓰고, description은 1~2문장으로 작성한다.",
+    "techStack은 이 프로젝트에 가장 잘 맞는 조합으로 선택한다.",
+    "requirements는 실제 구현 가능한 수준으로 작성하고, mustHaves는 3개 이상, niceToHaves는 2개 이상으로 구성한다.",
+    "constraints는 속도, 접근성, 운영 안정성 중 최소 하나를 포함한다.",
+    "",
+    normalizedIdea || "아직 아이디어가 없다. 범용적인 새 SaaS 제품 초안을 작성하라.",
   ].join("\n");
 }
 

@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { getGeminiModel } from "@/lib/gemini";
+import type {
+  RoleQualityStatsRecord,
+  RoleRepairProfileRecord,
+} from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
+import {
+  buildRoleExecutionOrder,
+  buildRoleTaskMap,
+  sortAgentsByRole,
+  type WorkflowRole,
+} from "@/lib/workflow-guidance";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -12,10 +22,14 @@ type HarnessConfig = {
   workspacePath?: string;
   lastMessage?: string;
   lastRunAt?: string;
+  roleQualityStats?: RoleQualityStatsRecord;
+  repairProfile?: RoleRepairProfileRecord | null;
+  roleExecutionOrder?: WorkflowRole[];
 };
 
 const AGENT_TEMPLATES = [
   { name: "PO 플래너", type: "planner" },
+  { name: "프로그램 비평가", type: "critic" },
   { name: "UI 디자이너", type: "designer" },
   { name: "프론트엔드 코더", type: "coder" },
   { name: "QA 테스터", type: "tester" },
@@ -23,8 +37,30 @@ const AGENT_TEMPLATES = [
 
 export async function POST(_request: Request, context: RouteContext) {
   const { id: projectId } = await context.params;
+  let workflowLocked = false;
 
   try {
+    const lockResult = await prisma.workflow.updateMany({
+      where: {
+        projectId,
+        orchestratorStatus: {
+          not: "running",
+        },
+      },
+      data: {
+        orchestratorStatus: "running",
+      },
+    });
+
+    if (lockResult.count === 0) {
+      return NextResponse.json(
+        { error: "다른 워크플로우 실행이 진행 중입니다." },
+        { status: 409 }
+      );
+    }
+
+    workflowLocked = true;
+
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -62,15 +98,24 @@ export async function POST(_request: Request, context: RouteContext) {
 
     if (project.workflow.currentPhase === "planning") {
       const message = "요구사항 정리가 완료되어 백로그 준비 단계로 전환했습니다.";
+      const roleExecutionOrder = buildRoleExecutionOrder(
+        harnessBase.roleQualityStats,
+        "backlog",
+        harnessBase.repairProfile?.focusRoles ?? []
+      );
 
       await prisma.$transaction([
         prisma.workflow.update({
           where: { projectId },
           data: {
             currentPhase: "backlog",
-            orchestratorStatus: "idle",
             harnessConfig: JSON.stringify(
-              mergeHarnessConfig(harnessBase, project.workspacePath, message)
+              mergeHarnessConfig(
+                harnessBase,
+                project.workspacePath,
+                message,
+                roleExecutionOrder
+              )
             ),
           },
         }),
@@ -84,6 +129,12 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     if (project.workflow.currentPhase === "backlog") {
+      const roleExecutionOrder = buildRoleExecutionOrder(
+        harnessBase.roleQualityStats,
+        "sprint",
+        harnessBase.repairProfile?.focusRoles ?? []
+      );
+      const orderedAgents = sortAgentsByRole(agents, roleExecutionOrder);
       const existingSprint = project.sprints[0];
       const sprint =
         existingSprint ??
@@ -117,7 +168,7 @@ export async function POST(_request: Request, context: RouteContext) {
         );
       }
 
-      const assignments = agents.filter((agent) => agent.type !== "tester");
+      const assignments = orderedAgents.filter((agent) => agent.type !== "tester" && agent.type !== "critic");
 
       if (selectedBacklogs.length > 0) {
         await prisma.$transaction(async (tx) => {
@@ -144,12 +195,9 @@ export async function POST(_request: Request, context: RouteContext) {
       }
 
       await setAgentState({
-        agents,
-        runningTypes: new Set(["planner", "designer", "coder"]),
-        currentTask:
-          selectedBacklogs[0]?.title ??
-          existingSprint?.tasks[0]?.title ??
-          `${project.name} Sprint 1 준비`,
+        agents: orderedAgents,
+        runningTypes: new Set(["planner", "critic", "designer", "coder"]),
+        currentTaskByType: buildRoleTaskMap(project.name, "backlog"),
       });
 
       const taskCount = selectedBacklogs.length || existingSprint?.tasks.length || 0;
@@ -163,9 +211,13 @@ export async function POST(_request: Request, context: RouteContext) {
           where: { projectId },
           data: {
             currentPhase: "sprint",
-            orchestratorStatus: "idle",
             harnessConfig: JSON.stringify(
-              mergeHarnessConfig(harnessBase, project.workspacePath, message)
+              mergeHarnessConfig(
+                harnessBase,
+                project.workspacePath,
+                message,
+                roleExecutionOrder
+              )
             ),
           },
         }),
@@ -188,6 +240,12 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     if (project.workflow.currentPhase === "sprint") {
+      const roleExecutionOrder = buildRoleExecutionOrder(
+        harnessBase.roleQualityStats,
+        "review",
+        harnessBase.repairProfile?.focusRoles ?? []
+      );
+      const orderedAgents = sortAgentsByRole(agents, roleExecutionOrder);
       const reviewReadyTasks = sprint.tasks.filter((task) => task.status !== "done");
 
       if (!reviewReadyTasks.length) {
@@ -210,9 +268,9 @@ export async function POST(_request: Request, context: RouteContext) {
       });
 
       await setAgentState({
-        agents,
-        runningTypes: new Set(["tester"]),
-        currentTask: `${project.name} QA 리뷰`,
+        agents: orderedAgents,
+        runningTypes: new Set(["tester", "critic"]),
+        currentTaskByType: buildRoleTaskMap(project.name, "review"),
       });
 
       const message = `Sprint 작업 ${reviewReadyTasks.length}개를 테스트 및 검토 단계로 이동했습니다.`;
@@ -221,9 +279,13 @@ export async function POST(_request: Request, context: RouteContext) {
         where: { projectId },
         data: {
           currentPhase: "review",
-          orchestratorStatus: "idle",
           harnessConfig: JSON.stringify(
-            mergeHarnessConfig(harnessBase, project.workspacePath, message)
+            mergeHarnessConfig(
+              harnessBase,
+              project.workspacePath,
+              message,
+              roleExecutionOrder
+            )
           ),
         },
       });
@@ -234,6 +296,13 @@ export async function POST(_request: Request, context: RouteContext) {
     const relatedBacklogIds = sprint.tasks
       .map((task) => task.backlogId)
       .filter((backlogId): backlogId is string => Boolean(backlogId));
+
+    const roleExecutionOrder = buildRoleExecutionOrder(
+      harnessBase.roleQualityStats,
+      "retro",
+      harnessBase.repairProfile?.focusRoles ?? []
+    );
+    const orderedAgents = sortAgentsByRole(agents, roleExecutionOrder);
 
     await prisma.$transaction(async (tx) => {
       await tx.task.updateMany({
@@ -262,12 +331,12 @@ export async function POST(_request: Request, context: RouteContext) {
         where: { projectId },
         data: {
           currentPhase: "retro",
-          orchestratorStatus: "idle",
           harnessConfig: JSON.stringify(
             mergeHarnessConfig(
               harnessBase,
               project.workspacePath,
-              "테스트 및 검토가 완료되어 회고 단계까지 마무리했습니다."
+              "테스트 및 검토가 완료되어 회고 단계까지 마무리했습니다.",
+              roleExecutionOrder
             )
           ),
         },
@@ -280,9 +349,9 @@ export async function POST(_request: Request, context: RouteContext) {
     });
 
     await setAgentState({
-      agents,
+      agents: orderedAgents,
       runningTypes: new Set<string>(),
-      currentTask: null,
+      currentTaskByType: buildRoleTaskMap(project.name, "retro"),
     });
 
     return NextResponse.json({
@@ -294,30 +363,37 @@ export async function POST(_request: Request, context: RouteContext) {
       { error: "파이프라인 실행을 시작하지 못했습니다." },
       { status: 500 }
     );
+  } finally {
+    if (workflowLocked) {
+      await prisma.workflow
+        .updateMany({
+          where: {
+            projectId,
+            orchestratorStatus: "running",
+          },
+          data: {
+            orchestratorStatus: "idle",
+          },
+        })
+        .catch(() => null);
+    }
   }
 }
 
 async function ensureAgents() {
-  const existingAgents = await prisma.agent.findMany({
-    orderBy: { createdAt: "asc" },
-  });
-
-  const existingTypes = new Set(existingAgents.map((agent) => agent.type));
-  const missingAgents = AGENT_TEMPLATES.filter(
-    (template) => !existingTypes.has(template.type)
-  );
-
-  if (missingAgents.length > 0) {
-    for (const template of missingAgents) {
-      await prisma.agent.create({
-        data: {
+  await Promise.all(
+    AGENT_TEMPLATES.map((template) =>
+      prisma.agent.upsert({
+        where: { type: template.type },
+        create: {
           name: template.name,
           type: template.type,
           status: "idle",
         },
-      });
-    }
-  }
+        update: {},
+      })
+    )
+  );
 
   return prisma.agent.findMany({
     orderBy: { createdAt: "asc" },
@@ -327,11 +403,11 @@ async function ensureAgents() {
 async function setAgentState({
   agents,
   runningTypes,
-  currentTask,
+  currentTaskByType,
 }: {
   agents: Array<{ id: string; type: string }>;
   runningTypes: Set<string>;
-  currentTask: string | null;
+  currentTaskByType: Partial<Record<string, string>>;
 }) {
   await Promise.all(
     agents.map((agent) =>
@@ -339,7 +415,7 @@ async function setAgentState({
         where: { id: agent.id },
         data: {
           status: runningTypes.has(agent.type) ? "running" : "idle",
-          currentTask: runningTypes.has(agent.type) ? currentTask : null,
+          currentTask: runningTypes.has(agent.type) ? currentTaskByType[agent.type] ?? null : null,
         },
       })
     )
@@ -361,14 +437,17 @@ function parseHarnessConfig(value: string | null): HarnessConfig {
 function mergeHarnessConfig(
   current: HarnessConfig,
   workspacePath: string | null,
-  lastMessage: string
+  lastMessage: string,
+  roleExecutionOrder: WorkflowRole[]
 ) {
   return {
+    ...current,
     provider: current.provider ?? "gemini",
     model: current.model ?? getGeminiModel(),
     workspacePath: workspacePath ?? current.workspacePath,
     lastMessage,
     lastRunAt: new Date().toISOString(),
+    roleExecutionOrder,
   };
 }
 

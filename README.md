@@ -20,20 +20,36 @@ bun dev
 
 이 프로젝트는 [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts)를 사용해 [Geist](https://vercel.com/font) 글꼴을 자동으로 최적화하고 로드합니다.
 
+## 검증하기
+
+로컬에서 변경을 확인할 때는 아래 명령을 사용할 수 있습니다.
+
+```bash
+npm run lint
+npm run smoke:critic
+npm run smoke:planner
+npm run smoke:designer
+npm run smoke:tester
+npm run check
+```
+
+`npm run check`는 임시 개발 서버를 띄운 뒤 `critic` 스모크를 실행하고, 이어서 `planner`/`designer`/`tester` 회귀를 돌린 뒤 서버를 정리합니다.
+
 ## 환경 변수
 
-Gemini 기반 Phase 2 백로그 생성을 사용하려면 아래 환경 변수를 설정하세요.
+자동 생성 작업 폴더와 구조 생성을 사용하려면 아래 환경 변수를 설정하세요.
 
 ```bash
 DATABASE_URL="file:./dev.db"
 GEMINI_API_KEY="your-gemini-api-key"
 GEMINI_MODEL="gemini-2.5-flash"
-ORCHESTRA_PROJECTS_ROOT="D:\\rpa\\orchestra_projects"
+ORCHESTRA_PROJECTS_ROOT="../orchestra_projects"
 ```
 
 `.env.example`를 참고해 `.env`를 구성할 수 있습니다.
+`DATABASE_URL`은 로컬 개발에서는 비워도 되며, 그 경우 기본값 `file:./dev.db`를 사용합니다. 배포/CI 환경에서는 반드시 명시해야 합니다.
 Gemini 키를 교체하거나 새로 발급했다면 개발 서버를 다시 시작해야 반영됩니다.
-생성된 새 프로젝트는 `ORCHESTRA_PROJECTS_ROOT` 아래에 독립 워크스페이스로 작성됩니다.
+생성된 새 프로젝트는 기본적으로 `../orchestra_projects` 아래에 독립 작업 폴더로 작성됩니다. `ORCHESTRA_PROJECTS_ROOT`로 경로를 바꿀 수 있습니다.
 
 ## 더 알아보기
 

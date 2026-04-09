@@ -26,14 +26,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { title, description, assignedAgent, sprintId, backlogId } = body;
+    const normalizedTitle = typeof title === 'string' ? title.trim() : '';
 
-    if (!title) {
+    if (!normalizedTitle) {
       return NextResponse.json({ error: '작업 제목은 필수입니다.' }, { status: 400 });
     }
 
     const task = await prisma.task.create({
       data: {
-        title,
+        title: normalizedTitle,
         description,
         assignedAgent,
         sprintId,
