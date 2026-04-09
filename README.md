@@ -26,6 +26,7 @@ bun dev
 
 ```bash
 npm run lint
+npm run test:e2e
 npm run smoke:critic
 npm run smoke:planner
 npm run smoke:designer
@@ -34,6 +35,14 @@ npm run check
 ```
 
 `npm run check`는 임시 개발 서버를 띄운 뒤 `critic` 스모크를 실행하고, 이어서 `planner`/`designer`/`tester` 회귀를 돌린 뒤 서버를 정리합니다.
+`npm run test:e2e`는 `/projects/new`에서 실제 홈페이지를 생성하고 `preview`까지 이동하는 Playwright 시나리오를 검증합니다.
+
+## 최근 안정화
+
+- 생성 결과 저장 경로를 기본적으로 sibling `../orchestra_projects`에 고정했습니다.
+- 홈페이지 생성 완료 후 프로젝트 요약이 아니라 `preview`로 바로 이동합니다.
+- `critic check`와 Playwright E2E가 CI에서도 안정적으로 종료되도록 정리했습니다.
+- GitHub Actions는 `lint`, `check`, `test:e2e`를 모두 실행하며 현재 녹색 상태입니다.
 
 ## 환경 변수
 
