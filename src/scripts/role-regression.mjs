@@ -1,7 +1,10 @@
 import { mkdir, readFile, readdir, rm } from "fs/promises";
 import path from "path";
 
-const DEFAULT_WORKSPACE = "../orchestra_projects/운영-콘텐츠-허브-비평";
+const DEFAULT_WORKSPACES_ROOT = process.env.ORCHESTRA_PROJECTS_ROOT?.trim()
+  ? process.env.ORCHESTRA_PROJECTS_ROOT.trim()
+  : "../orchestra_projects";
+const DEFAULT_WORKSPACE = path.join(DEFAULT_WORKSPACES_ROOT, "운영-콘텐츠-허브-비평");
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:4010";
 const DEFAULT_INPUT = {
   name: "운영 콘텐츠 허브 비평",
@@ -70,7 +73,9 @@ async function main() {
     throw new Error("--role is required");
   }
 
-  const workspacePath = await ensureWorkspaceExists(path.join(process.cwd(), args.workspace));
+  const workspacePath = await ensureWorkspaceExists(
+    path.isAbsolute(args.workspace) ? args.workspace : path.join(process.cwd(), args.workspace)
+  );
   const context = JSON.parse(await readFile(path.join(workspacePath, "project.context.json"), "utf8"));
   const roleQuality = await readFile(path.join(workspacePath, "docs", "role-quality.md"), "utf8");
   const implementationGuide = await readFile(
